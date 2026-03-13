@@ -2,7 +2,10 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Helper functions
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
     function isAuthenticated() {
       return request.auth != null;
     }
@@ -11,37 +14,57 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
     
-    function isDocOwner() {
-      return isAuthenticated() && request.auth.uid == resource.data.userId;
+    function isAdmin() {
+      return isAuthenticated() && 
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         request.auth.token.email == "elfridw4@gmail.com");
     }
 
+    function isDocOwner() {
+      return isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
     function isValidUser(data) {
-      return data.keys().hasAll(['uid', 'email', 'role', 'createdAt']) &&
+      return data.keys().hasAll(['uid', 'email', 'role']) &&
              data.uid is string &&
              data.email is string &&
-             data.role in ['teacher', 'admin'];
+             data.role in ['teacher', 'admin'] &&
+             data.email.size() < 256;
     }
 
     function isValidContent(data) {
       return data.keys().hasAll(['userId', 'type', 'title', 'content', 'createdAt']) &&
-             data.userId == request.auth.uid &&
+             data.userId is string &&
              data.type in ['lesson_plan', 'exercises', 'quiz', 'simplification', 'activity', 'evaluation', 'revision_sheet'] &&
-             data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
-             data.content is string && data.content.size() > 0;
+             data.title is string && data.title.size() > 0 && data.title.size() < 500 &&
+             data.content is string && data.content.size() > 0 && data.content.size() < 50000;
     }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
 
     // User profiles
     match /users/{userId} {
-      allow read: if isOwner(userId);
+      allow read: if isOwner(userId) || isAdmin();
       allow create: if isOwner(userId) && isValidUser(request.resource.data);
-      allow update: if isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.role == resource.data.role;
+      allow update: if (isOwner(userId) || isAdmin()) && isValidUser(request.resource.data);
     }
 
     // Pedagogical contents
     match /contents/{contentId} {
       allow read: if isDocOwner();
-      allow create: if isAuthenticated() && isValidContent(request.resource.data);
-      allow update: if isDocOwner() && isValidContent(request.resource.data);
+      allow create: if isAuthenticated() && 
+                      isValidContent(request.resource.data) && 
+                      request.resource.data.userId == request.auth.uid;
+      allow update: if isDocOwner() && 
+                      isValidContent(request.resource.data) && 
+                      request.resource.data.userId == resource.data.userId; // Prevent ownership transfer
       allow delete: if isDocOwner();
     }
   }

@@ -14,10 +14,10 @@ const COUNTRIES = [
 ];
 
 const LEVELS = [
-  "Primaire (CI - CM2)",
-  "Collège (6ème - 3ème)",
-  "Lycée (2nde - Tle)",
-  "Université"
+  "CI", "CP", "CE1", "CE2", "CM1", "CM2",
+  "6ème", "5ème", "4ème", "3ème",
+  "2nde", "1ère", "Terminale",
+  "Licence 1", "Licence 2", "Licence 3", "Master", "Doctorat"
 ];
 
 const CONTENT_TYPES: { value: ContentType; label: string; description: string }[] = [
@@ -53,8 +53,8 @@ export default function GeneratorForm({ onGenerate, isGenerating }: GeneratorFor
         </h3>
       </div>
 
-      <div className="p-8 space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="p-4 lg:p-8 space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6">
           {/* Type de contenu */}
           <div className="md:col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-3">Que souhaitez-vous créer ?</label>

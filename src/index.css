@@ -1,5 +1,31 @@
 @import "tailwindcss";
 
+@theme {
+  --color-emerald-50: #ecfdf5;
+  --color-emerald-100: #d1fae5;
+  --color-emerald-200: #a7f3d0;
+  --color-emerald-300: #6ee7b7;
+  --color-emerald-400: #34d399;
+  --color-emerald-500: #10b981;
+  --color-emerald-600: #059669;
+  --color-emerald-700: #047857;
+  --color-emerald-800: #065f46;
+  --color-emerald-900: #064e3b;
+  --color-emerald-950: #022c22;
+
+  --color-gray-50: #f9fafb;
+  --color-gray-100: #f3f4f6;
+  --color-gray-200: #e5e7eb;
+  --color-gray-300: #d1d5db;
+  --color-gray-400: #9ca3af;
+  --color-gray-500: #6b7280;
+  --color-gray-600: #4b5563;
+  --color-gray-700: #374151;
+  --color-gray-800: #1f2937;
+  --color-gray-900: #111827;
+  --color-gray-950: #030712;
+}
+
 @layer base {
   .prose h1 { @apply text-3xl font-bold mb-6 mt-8; }
   .prose h2 { @apply text-2xl font-bold mb-4 mt-6; }
@@ -17,7 +43,28 @@
 
 @media print {
   .no-print { display: none !important; }
-  body { background: white !important; }
-  main { padding: 0 !important; }
-  .prose { max-width: none !important; }
+  body { 
+    background: white !important; 
+    color: black !important;
+  }
+  main { 
+    padding: 0 !important; 
+    margin: 0 !important;
+  }
+  .prose { 
+    max-width: none !important; 
+    font-size: 12pt !important;
+  }
+  #printable-content {
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+  h1 { font-size: 24pt !important; margin-bottom: 20pt !important; }
+  h2 { font-size: 18pt !important; margin-top: 20pt !important; }
+  p, li { font-size: 12pt !important; line-height: 1.5 !important; }
+  
+  @page {
+    margin: 2cm;
+  }
 }

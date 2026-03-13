@@ -25,7 +25,13 @@ export const generatePedagogicalContent = async (params: GenerationParams) => {
   const model = ai.models.generateContent({
     model: "gemini-3.1-pro-preview",
     config: {
-      systemInstruction: `Tu es un expert en éducation africaine (EdTech). Ton objectif est de générer du contenu pédagogique de haute qualité adapté aux programmes scolaires africains. Utilise des exemples locaux, des références culturelles africaines et un langage adapté au niveau scolaire spécifié.`,
+      systemInstruction: `Tu es un expert en éducation africaine (EdTech). Ton objectif est de générer du contenu pédagogique de haute qualité adapté aux programmes scolaires africains. 
+      
+      RÈGLES CRITIQUES :
+      1. Utilise des exemples locaux, des références culturelles africaines et un langage adapté au niveau scolaire spécifié.
+      2. Pour les formules mathématiques ou scientifiques, utilise EXCLUSIVEMENT le format LaTeX avec des délimiteurs $ pour les formules en ligne (ex: $E=mc^2$) et $$ pour les blocs (ex: $$\\int_a^b f(x)dx$$).
+      3. Si une illustration visuelle est pertinente pour le sujet, commence TOUJOURS ta réponse par une ligne au format : IMAGE_PROMPT: [description détaillée en anglais pour un générateur d'images]. La description doit être précise et pédagogique.
+      4. Ne généralise pas les niveaux scolaires, respecte strictement le niveau demandé.`,
     },
     contents: [
       {

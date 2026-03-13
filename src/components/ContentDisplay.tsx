@@ -42,13 +42,46 @@ export default function ContentDisplay({
   };
 
   const handlePrint = () => {
-    try {
-      window.print();
-    } catch (error) {
-      console.error("Print error:", error);
-      // Fallback for some environments
-      document.execCommand('print', false);
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert("Veuillez autoriser les fenêtres surgissantes pour imprimer.");
+      return;
     }
+
+    const contentHtml = document.getElementById('printable-content')?.innerHTML || '';
+    const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
+      .map(style => style.outerHTML)
+      .join('\n');
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>${title}</title>
+          ${styles}
+          <style>
+            body { background: white !important; padding: 20px; }
+            .no-print { display: none !important; }
+            @media print {
+              @page { margin: 2cm; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="prose prose-emerald max-w-none">
+            ${contentHtml}
+          </div>
+          <script>
+            window.onload = () => {
+              setTimeout(() => {
+                window.print();
+                window.close();
+              }, 500);
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
   };
 
   const handleExportPDF = async () => {
@@ -63,7 +96,24 @@ export default function ContentDisplay({
         logging: false,
         backgroundColor: '#ffffff',
         windowWidth: element.scrollWidth,
-        windowHeight: element.scrollHeight
+        windowHeight: element.scrollHeight,
+        onclone: (clonedDoc) => {
+          const el = clonedDoc.getElementById('printable-content');
+          if (el) {
+            // Fix for "oklab" color function error in html2canvas
+            // We replace problematic colors with standard ones in the cloned document
+            const allElements = el.getElementsByTagName('*');
+            for (let i = 0; i < allElements.length; i++) {
+              const item = allElements[i] as HTMLElement;
+              const style = window.getComputedStyle(item);
+              
+              // If the computed color or background contains oklab/oklch, force a safe color
+              if (style.color.includes('okl')) item.style.color = '#111827';
+              if (style.backgroundColor.includes('okl')) item.style.backgroundColor = 'transparent';
+              if (style.borderColor.includes('okl')) item.style.borderColor = '#e5e7eb';
+            }
+          }
+        }
       });
       
       const imgData = canvas.toDataURL('image/png');

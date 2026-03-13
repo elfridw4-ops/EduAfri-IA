@@ -85,7 +85,7 @@ export default function App() {
         config: {
           imageConfig: {
             aspectRatio: "16:9",
-            imageSize: "1K"
+            imageSize: "512px"
           }
         }
       });
@@ -117,13 +117,15 @@ export default function App() {
         imageUrl = await generateImage(imagePrompt) || undefined;
       }
 
-      const title = `${params.type.replace('_', ' ').toUpperCase()} : ${params.subject || params.concept}`;
+      const title = `${params.type.replace('_', ' ').toUpperCase()} : ${params.notion}`;
       const newContent = { 
         title, 
         content, 
         imageUrl,
         type: params.type,
-        subject: params.subject || params.concept,
+        subject: params.subject,
+        notion: params.notion,
+        subTopic: params.subTopic,
         level: params.level,
         country: params.country
       };
@@ -173,17 +175,31 @@ export default function App() {
       // Strip id if it exists (e.g. from history) to avoid duplicate id in data
       const { id, ...contentToSave } = generatedContent as any;
       
-      await addDoc(collection(db, path), {
+      const docData = {
         userId: user.uid,
         ...contentToSave,
         imageUrl: generatedContent.imageUrl || null,
         createdAt: serverTimestamp()
-      });
+      };
+
+      // Estimate document size (Firestore limit is 1MB)
+      const sizeEstimate = JSON.stringify(docData).length;
+      
+      // If size > 900KB, try to save without the image (base64 images are huge)
+      if (sizeEstimate > 900000 && docData.imageUrl) {
+        console.warn("Document too large, saving without image.");
+        docData.imageUrl = null;
+        setToast({ message: "Le contenu est très volumineux. Sauvegarde effectuée sans l'image pour respecter les limites.", type: 'success' });
+      }
+
+      await addDoc(collection(db, path), docData);
       setIsSaved(true);
-      setToast({ message: "Contenu sauvegardé avec succès !", type: 'success' });
+      if (!toast) {
+        setToast({ message: "Contenu sauvegardé avec succès !", type: 'success' });
+      }
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, path);
-      setToast({ message: "Erreur lors de la sauvegarde.", type: 'error' });
+      setToast({ message: "Erreur lors de la sauvegarde. Le contenu est peut-être trop volumineux.", type: 'error' });
     }
   };
 
@@ -403,6 +419,11 @@ function FileIcon({ type }: { type: string }) {
   switch (type) {
     case 'lesson_plan': return <BookOpen size={20} />;
     case 'quiz': return <Sparkles size={20} />;
+    case 'exercises': return <History size={20} />;
+    case 'simplification': return <Sparkles size={20} />;
+    case 'activity': return <BookOpen size={20} />;
+    case 'evaluation': return <AlertCircle size={20} />;
+    case 'revision_sheet': return <History size={20} />;
     default: return <History size={20} />;
   }
 }

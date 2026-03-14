@@ -353,12 +353,12 @@ export default function GeneratorForm({ onGenerate, isGenerating }: GeneratorFor
           )}
 
           {/* NAVIGATION */}
-          <div className="flex items-center justify-between pt-6 border-t border-gray-100">
+          <div className="flex items-center justify-between pt-8 border-t border-gray-100">
             {step > 1 ? (
               <button
                 type="button"
                 onClick={() => setStep(step - 1)}
-                className="px-8 py-4 text-gray-500 font-bold hover:text-gray-900 transition-colors"
+                className="px-8 py-4 text-gray-500 font-bold hover:text-gray-900 transition-all hover:bg-gray-50 rounded-2xl"
               >
                 Retour
               </button>
@@ -369,7 +369,7 @@ export default function GeneratorForm({ onGenerate, isGenerating }: GeneratorFor
                 type="button"
                 disabled={!canGoNext()}
                 onClick={() => setStep(step + 1)}
-                className="px-10 py-4 bg-gray-900 text-white rounded-2xl font-bold hover:bg-gray-800 disabled:bg-gray-200 disabled:text-gray-400 transition-all shadow-xl shadow-gray-200 flex items-center gap-2"
+                className="px-10 py-4 bg-gray-900 text-white rounded-2xl font-bold hover:bg-gray-800 disabled:bg-gray-100 disabled:text-gray-400 transition-all shadow-xl shadow-gray-200 flex items-center gap-2 active:scale-95"
               >
                 Continuer <ChevronRight size={20} />
               </button>
@@ -377,12 +377,12 @@ export default function GeneratorForm({ onGenerate, isGenerating }: GeneratorFor
               <button
                 type="submit"
                 disabled={isGenerating || !canGoNext()}
-                className="px-10 py-4 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 disabled:bg-gray-200 transition-all shadow-xl shadow-emerald-200 flex items-center gap-2"
+                className="px-10 py-4 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 disabled:bg-gray-200 transition-all shadow-xl shadow-emerald-200 flex items-center gap-2 active:scale-95"
               >
                 {isGenerating ? (
                   <>
                     <Loader2 className="animate-spin" size={20} />
-                    Génération exhaustive...
+                    Génération en cours...
                   </>
                 ) : (
                   <>

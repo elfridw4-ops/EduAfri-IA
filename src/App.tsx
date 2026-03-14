@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { auth, db, handleFirestoreError, OperationType } from './firebase';
+import { auth, db, storage, handleFirestoreError, OperationType } from './firebase';
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { collection, addDoc, query, where, orderBy, onSnapshot, serverTimestamp, deleteDoc, doc } from 'firebase/firestore';
+import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import Layout from './components/Layout';
 import GeneratorForm from './components/GeneratorForm';
 import ContentDisplay from './components/ContentDisplay';
-import { generatePedagogicalContent } from './services/ai';
+import { generatePedagogicalContent, transformContent } from './services/ai';
 import { PedagogicalContent } from './types';
 import { GoogleGenAI } from "@google/genai";
 import { BookOpen, Sparkles, History, ArrowRight, LogIn, Loader2, Trash2, X, AlertCircle, CheckCircle2 } from 'lucide-react';
@@ -149,6 +150,49 @@ export default function App() {
     }
   };
 
+  const handleTransform = async (targetType: any) => {
+    if (!generatedContent || !lastParams) return;
+    
+    setIsGenerating(true);
+    try {
+      const rawContent = await transformContent(generatedContent.content, targetType, lastParams);
+      let content = rawContent || "";
+      let imageUrl = undefined;
+
+      if (content.startsWith('IMAGE_PROMPT:')) {
+        const lines = content.split('\n');
+        const promptLine = lines[0];
+        const imagePrompt = promptLine.replace('IMAGE_PROMPT:', '').trim();
+        content = lines.slice(1).join('\n').trim();
+        imageUrl = await generateImage(imagePrompt) || undefined;
+      }
+
+      const title = `${targetType.replace('_', ' ').toUpperCase()} : ${lastParams.notion}`;
+      const newContent = { 
+        title, 
+        content, 
+        imageUrl,
+        type: targetType,
+        subject: lastParams.subject,
+        notion: lastParams.notion,
+        subTopic: lastParams.subTopic,
+        level: lastParams.level,
+        country: lastParams.country
+      };
+
+      setGeneratedContent(newContent);
+      setSessionHistory(prev => [...prev, newContent]);
+      setCurrentIndex(prev => prev + 1);
+      setIsSaved(false);
+      setToast({ message: `Contenu transformé en ${targetType.replace('_', ' ')} !`, type: 'success' });
+    } catch (error) {
+      console.error("Transformation error:", error);
+      setToast({ message: "Erreur lors de la transformation.", type: 'error' });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const handlePrevious = () => {
     if (currentIndex > 0) {
       const newIndex = currentIndex - 1;
@@ -175,18 +219,34 @@ export default function App() {
       // Strip id if it exists (e.g. from history) to avoid duplicate id in data
       const { id, ...contentToSave } = generatedContent as any;
       
+      let finalImageUrl = generatedContent.imageUrl || null;
+
+      // If it's a base64 image, upload it to Storage to avoid Firestore size limits
+      if (finalImageUrl && finalImageUrl.startsWith('data:image')) {
+        try {
+          const filename = `images/${user.uid}/${Date.now()}.png`;
+          const storageRef = ref(storage, filename);
+          await uploadString(storageRef, finalImageUrl, 'data_url');
+          finalImageUrl = await getDownloadURL(storageRef);
+        } catch (storageError) {
+          console.error("Error uploading image to storage:", storageError);
+          // If storage fails, we'll try to save with base64, but it might hit the size limit
+        }
+      }
+
       const docData = {
         userId: user.uid,
         ...contentToSave,
-        imageUrl: generatedContent.imageUrl || null,
+        imageUrl: finalImageUrl,
+        params: lastParams,
         createdAt: serverTimestamp()
       };
 
       // Estimate document size (Firestore limit is 1MB)
       const sizeEstimate = JSON.stringify(docData).length;
       
-      // If size > 900KB, try to save without the image (base64 images are huge)
-      if (sizeEstimate > 900000 && docData.imageUrl) {
+      // If size > 900KB and it's still a base64 image, remove it to prevent save failure
+      if (sizeEstimate > 900000 && docData.imageUrl && docData.imageUrl.startsWith('data:image')) {
         console.warn("Document too large, saving without image.");
         docData.imageUrl = null;
         setToast({ message: "Le contenu est très volumineux. Sauvegarde effectuée sans l'image pour respecter les limites.", type: 'success' });
@@ -235,7 +295,7 @@ export default function App() {
           </p>
           <button
             onClick={handleLogin}
-            className="w-full flex items-center justify-center gap-3 py-4 px-6 bg-gray-900 text-white rounded-2xl font-semibold hover:bg-gray-800 transition-all shadow-xl shadow-gray-200"
+            className="w-full flex items-center justify-center gap-3 py-4 px-6 bg-gray-900 text-white rounded-2xl font-semibold hover:bg-gray-800 transition-all shadow-xl shadow-gray-200 active:scale-[0.98]"
           >
             <LogIn size={20} />
             Se connecter avec Google
@@ -260,7 +320,7 @@ export default function App() {
               <p className="text-emerald-100 max-w-md text-sm lg:text-base">Prêt à transformer votre prochain cours ? Utilisez nos outils d'IA pour gagner du temps.</p>
               <button 
                 onClick={() => setActiveTab('create')}
-                className="mt-6 px-6 py-3 bg-white text-emerald-700 rounded-xl font-bold flex items-center gap-2 hover:bg-emerald-50 transition-colors w-full sm:w-auto justify-center"
+                className="mt-6 px-6 py-3 bg-white text-emerald-700 rounded-xl font-bold flex items-center gap-2 hover:bg-emerald-50 transition-all w-full sm:w-auto justify-center shadow-lg shadow-emerald-900/20 active:scale-95"
               >
                 Commencer <ArrowRight size={18} />
               </button>
@@ -281,6 +341,13 @@ export default function App() {
                 {history.slice(0, 5).map((item) => (
                   <div key={item.id} className="p-4 flex items-center justify-between hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => {
                     setGeneratedContent(item);
+                    setLastParams(item.params || {
+                      type: item.type,
+                      subject: item.subject,
+                      level: item.level,
+                      country: item.country,
+                      notion: item.title.split(' : ')[1] || ""
+                    });
                     setActiveTab('create');
                   }}>
                     <div className="flex items-center gap-4">
@@ -316,33 +383,48 @@ export default function App() {
         </div>
       )}
 
-      {activeTab === 'create' && (
-        <div className="space-y-8">
-          {!generatedContent || isGenerating ? (
-            <GeneratorForm onGenerate={handleGenerate} isGenerating={isGenerating} />
-          ) : (
-            <div className="space-y-4">
-              <button 
-                onClick={() => setGeneratedContent(null)}
-                className="text-sm text-emerald-600 font-medium flex items-center gap-1 hover:underline no-print"
-              >
-                ← Créer un autre contenu
-              </button>
-              <ContentDisplay 
-                title={generatedContent.title} 
-                content={generatedContent.content} 
-                imageUrl={generatedContent.imageUrl}
-                onSave={isSaved ? undefined : handleSave} 
-                onRegenerate={handleRegenerate}
-                onPrevious={handlePrevious}
-                onNext={handleNext}
-                currentIndex={currentIndex}
-                totalCount={sessionHistory.length}
-              />
+          {activeTab === 'create' && (
+            <div className="space-y-8">
+              {(!generatedContent && !isGenerating) ? (
+                <GeneratorForm onGenerate={handleGenerate} isGenerating={isGenerating} />
+              ) : (
+                <div className="space-y-4 relative">
+                  {isGenerating && (
+                    <div className="absolute inset-0 z-50 bg-white/60 backdrop-blur-[2px] rounded-3xl flex flex-col items-center justify-center gap-4 animate-in fade-in duration-300">
+                      <div className="p-4 bg-white rounded-2xl shadow-xl border border-black/5 flex flex-col items-center gap-3">
+                        <Loader2 className="animate-spin text-emerald-600" size={32} />
+                        <p className="font-bold text-gray-900">Génération en cours...</p>
+                        <p className="text-xs text-gray-500">L'IA prépare votre contenu pédagogique</p>
+                      </div>
+                    </div>
+                  )}
+                  <button 
+                    onClick={() => {
+                      setGeneratedContent(null);
+                      setSessionHistory([]);
+                      setCurrentIndex(-1);
+                    }}
+                    className="text-sm text-emerald-600 font-bold flex items-center gap-2 hover:text-emerald-700 transition-colors no-print px-2 py-1 rounded-lg hover:bg-emerald-50 w-fit"
+                  >
+                    <ArrowRight size={16} className="rotate-180" />
+                    Nouveau contenu
+                  </button>
+                  <ContentDisplay 
+                    title={generatedContent?.title || "Génération..."} 
+                    content={generatedContent?.content || ""} 
+                    imageUrl={generatedContent?.imageUrl}
+                    onSave={isSaved ? undefined : handleSave} 
+                    onRegenerate={handleRegenerate}
+                    onPrevious={handlePrevious}
+                    onNext={handleNext}
+                    onTransform={handleTransform}
+                    currentIndex={currentIndex}
+                    totalCount={sessionHistory.length}
+                  />
+                </div>
+              )}
             </div>
           )}
-        </div>
-      )}
 
       {activeTab === 'history' && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:gap-6">
@@ -352,6 +434,13 @@ export default function App() {
               className="bg-white p-6 rounded-2xl border border-black/5 shadow-sm hover:shadow-md transition-all cursor-pointer group"
               onClick={() => {
                 setGeneratedContent(item);
+                setLastParams(item.params || {
+                  type: item.type,
+                  subject: item.subject,
+                  level: item.level,
+                  country: item.country,
+                  notion: item.title.split(' : ')[1] || ""
+                });
                 setActiveTab('create');
               }}
             >

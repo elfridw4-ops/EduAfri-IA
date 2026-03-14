@@ -16,6 +16,8 @@ export interface PedagogicalContent {
   level: string;
   country: string;
   content: string;
+  imageUrl?: string | null;
+  params?: any;
   createdAt: string;
 }
 

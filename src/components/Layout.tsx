@@ -143,7 +143,7 @@ function MobileNavItem({ icon, active, onClick }: { icon: React.ReactNode, activ
   return (
     <button
       onClick={onClick}
-      className={`p-2 rounded-xl transition-all ${
+      className={`p-2 rounded-xl transition-all active:scale-90 ${
         active 
           ? 'text-emerald-600 bg-emerald-50' 
           : 'text-gray-400'
@@ -158,7 +158,7 @@ function NavItem({ icon, label, active, onClick }: { icon: React.ReactNode, labe
   return (
     <button
       onClick={onClick}
-      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
+      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 active:scale-[0.98] ${
         active 
           ? 'bg-emerald-50 text-emerald-700 shadow-sm' 
           : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'

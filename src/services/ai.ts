@@ -49,6 +49,40 @@ export const generatePedagogicalContent = async (params: GenerationParams) => {
   return response.text;
 };
 
+export const transformContent = async (sourceContent: string, targetType: ContentType, originalParams: any) => {
+  const model = ai.models.generateContent({
+    model: "gemini-3.1-pro-preview",
+    config: {
+      systemInstruction: `Tu es un expert en éducation africaine. Ta mission est de TRANSFORMER un contenu existant en un nouveau format pédagogique.
+      
+      RÈGLES :
+      1. FIDÉLITÉ : Garde les concepts clés du contenu source.
+      2. FORMAT : Respecte strictement le nouveau format demandé (Quiz, Exercices, etc.).
+      3. ILLUSTRATION : Commence TOUJOURS ta réponse par une ligne au format : IMAGE_PROMPT: [description détaillée en anglais pour un générateur d'images].
+      4. MATHÉMATIQUES : Utilise LaTeX ($...$ et $$...$$).`,
+    },
+    contents: [
+      {
+        parts: [
+          {
+            text: `Voici un contenu source sur "${originalParams.notion}" (${originalParams.subject}, niveau ${originalParams.level}) :
+            
+            ---
+            ${sourceContent}
+            ---
+            
+            TRANSFORME ce contenu en : ${targetType.replace('_', ' ').toUpperCase()}.
+            ${getPrompt({ ...originalParams, type: targetType })}`
+          }
+        ]
+      }
+    ]
+  });
+
+  const response = await model;
+  return response.text;
+};
+
 function getPrompt(params: GenerationParams): string {
   const { type, level, country, subject, notion, subTopic, duration } = params;
   const detail = subTopic ? `en mettant l'accent sur : ${subTopic}` : "";
